@@ -19,7 +19,7 @@
         </div>
     <?php endif; ?>
     
-    <form action="<?= base_url('login') ?>" method="post">
+    <form action="/login" method="post">
         <?= csrf_field() ?>
         
         <div class="mb-3">
@@ -50,7 +50,7 @@
     </form>
     
     <div class="text-center mt-4">
-        <p>Belum punya akun? <a href="<?= base_url('signup') ?>">Daftar Sekarang</a></p>
+        <p>Belum punya akun? <a href="/signup">Daftar Sekarang</a></p>
     </div>
 </div>
-<?= $this->endSection() ?> 
+<?= $this->endSection() ?>

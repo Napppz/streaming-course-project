@@ -131,6 +131,7 @@ class PaymentCallbackController extends BaseController
     {
         $userId = (int) $this->getCurrentUserId();
         $transaction = $this->paymentTransactionModel->findReturnTransactionForUser($userId, $this->request->getGet());
+        $transaction = $this->syncReturnTransactionFromProvider($transaction);
         $statusMeta = $this->resolveStatusMeta($transaction['status'] ?? null, $returnContext);
 
         return view('user/payment_return_status', [
@@ -143,6 +144,7 @@ class PaymentCallbackController extends BaseController
     {
         $userId = (int) $this->getCurrentUserId();
         $transaction = $this->paymentTransactionModel->findReturnTransactionForUser($userId, $this->request->getGet());
+        $transaction = $this->syncReturnTransactionFromProvider($transaction);
         $statusMeta = $this->resolveStatusMeta($transaction['status'] ?? null, $returnContext);
 
         $flashKey = match ($statusMeta['variant']) {
@@ -160,6 +162,77 @@ class PaymentCallbackController extends BaseController
         return redirect()
             ->to(site_url('user/payment-history'))
             ->with($flashKey, $statusMeta['message']);
+    }
+
+    private function syncReturnTransactionFromProvider(?array $transaction): ?array
+    {
+        if (!$transaction || !$this->canSyncTransactionFromProvider($transaction)) {
+            return $transaction;
+        }
+
+        try {
+            $providerResponse = $this->xenditPaymentLinkService->getInvoiceById((string) $transaction['xendit_invoice_id']);
+            $providerMetadata = $providerResponse['provider_metadata'] ?? [];
+            $incomingStatus = (string) ($providerMetadata['status'] ?? 'pending');
+        } catch (\Throwable $exception) {
+            log_message('warning', 'Xendit return status sync failed for transaction {transactionId}: {message}', [
+                'transactionId' => $transaction['id'] ?? 'unknown',
+                'message' => $exception->getMessage(),
+            ]);
+
+            return $transaction;
+        }
+
+        $this->db->transBegin();
+
+        try {
+            $lockedTransaction = $this->lockTransactionForSettlement((int) $transaction['id']);
+
+            if (!$lockedTransaction) {
+                throw new \RuntimeException('Transaction disappeared before provider status sync.');
+            }
+
+            $persistedStatus = $this->resolvePersistedStatus((string) ($lockedTransaction['status'] ?? 'pending'), $incomingStatus);
+            $updateData = $this->buildProviderSyncUpdateData($lockedTransaction, $providerMetadata, $persistedStatus);
+
+            if ($persistedStatus === 'paid') {
+                $updateData = array_merge($updateData, $this->buildEnrollmentGrantData($lockedTransaction));
+            }
+
+            $this->paymentTransactionModel->update((int) $lockedTransaction['id'], $updateData);
+
+            if ($this->db->transStatus() === false) {
+                throw new \RuntimeException('Failed to persist provider status sync.');
+            }
+
+            $this->db->transCommit();
+
+            return $this->paymentTransactionModel->findReturnTransactionForUser(
+                (int) $lockedTransaction['user_id'],
+                ['id' => $lockedTransaction['xendit_invoice_id'] ?? $transaction['xendit_invoice_id']]
+            ) ?: array_merge($lockedTransaction, $updateData);
+        } catch (\Throwable $exception) {
+            $this->db->transRollback();
+
+            log_message('error', 'Xendit return settlement failed: {message}', [
+                'message' => $exception->getMessage(),
+            ]);
+
+            return $transaction;
+        }
+    }
+
+    private function canSyncTransactionFromProvider(array $transaction): bool
+    {
+        if (($transaction['provider'] ?? null) !== 'xendit') {
+            return false;
+        }
+
+        if (empty($transaction['xendit_invoice_id'])) {
+            return false;
+        }
+
+        return ($transaction['status'] ?? 'pending') === 'pending';
     }
 
     private function lockTransactionForSettlement(int $transactionId): ?array
@@ -213,6 +286,40 @@ class PaymentCallbackController extends BaseController
         if ($persistedStatus === 'pending') {
             $updateData['failure_code'] = null;
             $updateData['failure_message'] = null;
+        }
+
+        return $updateData;
+    }
+
+    private function buildProviderSyncUpdateData(array $transaction, array $providerMetadata, string $persistedStatus): array
+    {
+        $now = date('Y-m-d H:i:s');
+        $updateData = [
+            'status' => $persistedStatus,
+            'xendit_status' => $providerMetadata['xendit_status'] ?? ($transaction['xendit_status'] ?? null),
+            'xendit_invoice_id' => $providerMetadata['xendit_invoice_id'] ?? ($transaction['xendit_invoice_id'] ?? null),
+            'xendit_external_id' => $providerMetadata['xendit_external_id'] ?? ($transaction['xendit_external_id'] ?? null),
+            'xendit_invoice_url' => $providerMetadata['xendit_invoice_url'] ?? ($transaction['xendit_invoice_url'] ?? null),
+            'checkout_url' => $providerMetadata['checkout_url'] ?? ($transaction['checkout_url'] ?? null),
+            'success_redirect_url' => $providerMetadata['success_redirect_url'] ?? ($transaction['success_redirect_url'] ?? null),
+            'failure_redirect_url' => $providerMetadata['failure_redirect_url'] ?? ($transaction['failure_redirect_url'] ?? null),
+            'expires_at' => $providerMetadata['expires_at'] ?? ($transaction['expires_at'] ?? null),
+        ];
+
+        if ($persistedStatus === 'paid') {
+            $updateData['paid_at'] = $transaction['paid_at'] ?: ($providerMetadata['paid_at'] ?? null) ?: $now;
+            $updateData['expired_at'] = $transaction['expired_at'] ?? null;
+            $updateData['cancelled_at'] = $transaction['cancelled_at'] ?? null;
+            $updateData['failure_code'] = null;
+            $updateData['failure_message'] = null;
+        }
+
+        if ($persistedStatus === 'expired' && empty($transaction['expired_at'])) {
+            $updateData['expired_at'] = $providerMetadata['expires_at'] ?? $now;
+        }
+
+        if ($persistedStatus === 'cancelled' && empty($transaction['cancelled_at'])) {
+            $updateData['cancelled_at'] = $now;
         }
 
         return $updateData;

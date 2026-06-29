@@ -80,8 +80,12 @@
                     <?php foreach ($reviews as $review): ?>
                         <div class="bg-background border rounded-lg p-5 flex space-x-4">
                             <div class="flex-shrink-0">
-                                <?php if (!empty($review['profile_picture'])): ?>
-                                    <img src="<?= base_url('uploads/profile_pictures/' . $review['profile_picture']) ?>" class="rounded-full h-10 w-10 object-cover" alt="<?= esc($review['full_name']) ?>">
+                                <?php
+                                    $profilePicture = trim((string) ($review['profile_picture'] ?? ''));
+                                    $profilePicturePath = $profilePicture !== '' ? FCPATH . 'avatar/' . $profilePicture : '';
+                                ?>
+                                <?php if ($profilePicture !== '' && is_file($profilePicturePath)): ?>
+                                    <img src="<?= base_url('avatar/' . $profilePicture) ?>" class="rounded-full h-10 w-10 object-cover" alt="<?= esc($review['full_name']) ?>">
                                 <?php else: ?>
                                     <div class="rounded-full h-10 w-10 bg-muted flex items-center justify-center text-muted-foreground">
                                         <i class="fas fa-user text-lg"></i>
@@ -116,4 +120,4 @@
         </div>
     </div>
 </div>
-<?= $this->endSection() ?> 
+<?= $this->endSection() ?>

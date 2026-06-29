@@ -1,0 +1,102 @@
+{
+  "active_plan": "/home/dwi/Downloads/streaming-course-project/.sisyphus/plans/premium-course-payment-xendit.md",
+  "started_at": "2026-04-26T05:28:15.239Z",
+  "session_ids": [
+    "ses_237bd7daaffeWgf5ChRvS9rkqE",
+    "ses_237abc6deffe1BNLmtWE5ejQjE",
+    "ses_237abc61dffeX808N8LDb5rMdy",
+    "ses_237abc60affedbST5DtnjiZvL4",
+    "ses_237abc5f2ffe4VqJBd8e4MtiGj"
+  ],
+  "plan_name": "premium-course-payment-xendit",
+  "session_origins": {
+    "ses_237bd7daaffeWgf5ChRvS9rkqE": "direct",
+    "ses_237abc6deffe1BNLmtWE5ejQjE": "appended",
+    "ses_237abc61dffeX808N8LDb5rMdy": "appended",
+    "ses_237abc60affedbST5DtnjiZvL4": "appended",
+    "ses_237abc5f2ffe4VqJBd8e4MtiGj": "appended"
+  },
+  "task_sessions": {
+    "todo:1": {
+      "task_key": "todo:1",
+      "task_label": "1",
+      "task_title": "Expand RBAC to `super_admin|admin|user` without changing admin page structure",
+      "session_id": "ses_237abc6deffe1BNLmtWE5ejQjE",
+      "agent": "Sisyphus-Junior",
+      "category": "",
+      "updated_at": "2026-04-26T06:10:59.421Z"
+    },
+    "todo:2": {
+      "task_key": "todo:2",
+      "task_label": "2",
+      "task_title": "Add PostgreSQL-safe premium course metadata and payment transaction schema",
+      "session_id": "ses_237933cf6ffeTGNR12o8mT38Zy",
+      "agent": "Sisyphus-Junior",
+      "category": "",
+      "updated_at": "2026-04-26T06:21:00.276Z"
+    },
+    "todo:3": {
+      "task_key": "todo:3",
+      "task_label": "3",
+      "task_title": "Build Xendit payment-link integration foundation and internal payment status mapping",
+      "session_id": "ses_2378ab831ffe5S9UbLcfxvFjQt",
+      "agent": "Sisyphus-Junior",
+      "category": "",
+      "updated_at": "2026-04-26T06:31:56.429Z"
+    },
+    "todo:4": {
+      "task_key": "todo:4",
+      "task_label": "4",
+      "task_title": "Extend existing admin course pages in-place for premium pricing management",
+      "session_id": "ses_23782116cffeqS2rWzX1PThSjr",
+      "agent": "Sisyphus-Junior",
+      "category": "",
+      "updated_at": "2026-04-26T06:55:38.996Z"
+    },
+    "todo:5": {
+      "task_key": "todo:5",
+      "task_label": "5",
+      "task_title": "Replace premium user enroll CTA with internal checkout page and reusable pending transaction flow",
+      "session_id": "ses_2376bdf67ffe25Z4EGGxtGItch",
+      "agent": "Sisyphus-Junior",
+      "category": "visual-engineering",
+      "updated_at": "2026-04-26T07:17:24.207Z"
+    },
+    "todo:6": {
+      "task_key": "todo:6",
+      "task_label": "6",
+      "task_title": "Process Xendit webhook and return pages with idempotent settlement-to-enrollment flow",
+      "session_id": "ses_237544f79ffeoC8nwH5jtdjL79",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-04-26T07:34:07.800Z"
+    },
+    "todo:7": {
+      "task_key": "todo:7",
+      "task_label": "7",
+      "task_title": "Enforce premium access gating across learning, reviews, and course availability paths",
+      "session_id": "ses_23745eda7ffeGLwb4Fz9orcbCA",
+      "agent": "Sisyphus-Junior",
+      "category": "",
+      "updated_at": "2026-04-26T07:56:20.396Z"
+    },
+    "todo:8": {
+      "task_key": "todo:8",
+      "task_label": "8",
+      "task_title": "Add admin payment monitoring and preserve existing admin user-management UX with super-admin-only privilege controls",
+      "session_id": "ses_23745ed2cffe1CSaTKGMRU2nIZ",
+      "agent": "Sisyphus-Junior",
+      "category": "",
+      "updated_at": "2026-04-26T07:59:18.166Z"
+    },
+    "final-wave:f1": {
+      "task_key": "final-wave:f1",
+      "task_label": "F1",
+      "task_title": "Plan Compliance Audit — oracle",
+      "session_id": "ses_2372fb782ffeLBDI0ikPZ9ENk3",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-04-26T08:32:19.977Z"
+    }
+  }
+}

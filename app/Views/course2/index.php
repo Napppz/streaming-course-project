@@ -179,7 +179,7 @@
                 <div class="p-6 max-w-4xl mx-auto">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-lg font-semibold">Lesson Content</h3>
-                        <button id="mark-complete-btn" class="flex items-center gap-2 px-3 py-1 text-sm border <?= $currentLesson['status'] === 'completed' ? 'bg-green-100 text-green-800 border-green-200' : 'border-gray-300 hover:bg-gray-50' ?> rounded" data-lesson-id="<?= $currentLesson['lessonId'] ?>" data-module-id="<?= $currentLesson['moduleId'] ?>">
+                        <button id="mark-complete-btn" class="flex items-center gap-2 px-3 py-1 text-sm border <?= $currentLesson['status'] === 'completed' ? 'bg-green-100 text-green-800 border-green-200' : 'border-gray-300 hover:bg-gray-50' ?> rounded" data-course-id="<?= $currentLesson['courseId'] ?>" data-lesson-id="<?= $currentLesson['lessonId'] ?>" data-module-id="<?= $currentLesson['moduleId'] ?>">
                             <i class="<?= $currentLesson['status'] === 'completed' ? 'fas' : 'far' ?> fa-check-circle"></i>
                             <?= $currentLesson['status'] === 'completed' ? 'Completed' : 'Mark as Complete' ?>
                         </button>

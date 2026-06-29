@@ -43,6 +43,8 @@ class Services extends BaseService
             'baseURI' => rtrim($config->baseUrl, '/') . '/',
             'timeout' => $config->timeout,
             'connect_timeout' => $config->connectTimeout,
+            'verify' => static::xenditCaBundlePath(),
+            'http_errors' => false,
             'headers' => [
                 'Accept' => 'application/json',
                 'Content-Type' => 'application/json',
@@ -65,5 +67,22 @@ class Services extends BaseService
             $config,
             static::xenditStatusMapper(false)
         );
+    }
+
+    private static function xenditCaBundlePath(): bool|string
+    {
+        $candidates = [
+            'C:\\xampp\\apache\\bin\\curl-ca-bundle.crt',
+            'C:\\xampp\\phpMyAdmin\\vendor\\composer\\ca-bundle\\res\\cacert.pem',
+            'C:\\xampp\\perl\\vendor\\lib\\Mozilla\\CA\\cacert.pem',
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (is_file($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return true;
     }
 }

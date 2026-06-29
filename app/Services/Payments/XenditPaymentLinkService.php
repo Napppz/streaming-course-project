@@ -35,8 +35,16 @@ class XenditPaymentLinkService
         $description = trim((string) ($transactionData['description'] ?? ('Pembayaran course premium: ' . $courseTitle)));
         $currency = strtoupper((string) ($transactionData['currency'] ?? $this->config->currency));
         $invoiceDuration = max(1, (int) ($transactionData['invoice_duration'] ?? $this->config->invoiceDuration));
-        $successRedirectUrl = trim((string) ($transactionData['success_redirect_url'] ?? $this->config->successRedirectUrl));
-        $failureRedirectUrl = trim((string) ($transactionData['failure_redirect_url'] ?? $this->config->failureRedirectUrl));
+        $successRedirectUrl = trim((string) ($transactionData['success_redirect_url'] ?? $this->currentSiteUrl('payment/xendit/success')));
+        $failureRedirectUrl = trim((string) ($transactionData['failure_redirect_url'] ?? $this->currentSiteUrl('payment/xendit/failure')));
+
+        if ($successRedirectUrl === '') {
+            $successRedirectUrl = trim($this->config->successRedirectUrl);
+        }
+
+        if ($failureRedirectUrl === '') {
+            $failureRedirectUrl = trim($this->config->failureRedirectUrl);
+        }
 
         if ($successRedirectUrl === '' || $failureRedirectUrl === '') {
             throw new InvalidArgumentException('Xendit redirect URLs must be configured before building a payment payload.');
@@ -68,6 +76,15 @@ class XenditPaymentLinkService
             $metadata = array_merge($metadata, $transactionData['metadata']);
         }
 
+        $customer = [
+            'given_names' => $givenNames,
+            'email' => $email,
+        ];
+
+        if ($surname !== '') {
+            $customer['surname'] = $surname;
+        }
+
         $payload = [
             'external_id' => $referenceCode,
             'amount' => $amount,
@@ -76,11 +93,7 @@ class XenditPaymentLinkService
             'currency' => $currency,
             'success_redirect_url' => $successRedirectUrl,
             'failure_redirect_url' => $failureRedirectUrl,
-            'customer' => [
-                'given_names' => $givenNames,
-                'surname' => $surname,
-                'email' => $email,
-            ],
+            'customer' => $customer,
             'items' => [$item],
             'metadata' => $metadata,
         ];
@@ -117,15 +130,32 @@ class XenditPaymentLinkService
         $response = $this->httpClient->post('v2/invoices', [
             'json' => $payload,
         ]);
-
-        $decodedResponse = json_decode((string) $response->getBody(), true);
-
-        if (!is_array($decodedResponse)) {
-            throw new RuntimeException('Unexpected Xendit response: unable to decode JSON body.');
-        }
+        $decodedResponse = $this->decodeJsonResponse($response, 'create Xendit invoice');
 
         return [
             'request_payload' => $payload,
+            'response_payload' => $decodedResponse,
+            'provider_metadata' => $this->extractProviderMetadata($decodedResponse),
+        ];
+    }
+
+    /**
+     * @return array{response_payload: array<string, mixed>, provider_metadata: array<string, mixed>}
+     */
+    public function getInvoiceById(string $invoiceId): array
+    {
+        $this->assertApiReady();
+
+        $invoiceId = trim($invoiceId);
+
+        if ($invoiceId === '') {
+            throw new InvalidArgumentException('Missing Xendit invoice ID.');
+        }
+
+        $response = $this->httpClient->get('v2/invoices/' . rawurlencode($invoiceId));
+        $decodedResponse = $this->decodeJsonResponse($response, 'get Xendit invoice');
+
+        return [
             'response_payload' => $decodedResponse,
             'provider_metadata' => $this->extractProviderMetadata($decodedResponse),
         ];
@@ -143,6 +173,13 @@ class XenditPaymentLinkService
         $invoiceId = isset($responsePayload['id']) ? (string) $responsePayload['id'] : null;
         $checkoutUrl = isset($responsePayload['invoice_url']) ? (string) $responsePayload['invoice_url'] : null;
         $expiryDate = isset($responsePayload['expiry_date']) ? (string) $responsePayload['expiry_date'] : null;
+        $paidAt = isset($responsePayload['paid_at']) ? (string) $responsePayload['paid_at'] : null;
+        $updatedAt = isset($responsePayload['updated']) ? (string) $responsePayload['updated'] : null;
+        $normalizedStatus = $this->statusMapper->normalize($xenditStatus);
+
+        if ($paidAt === null && $normalizedStatus === 'paid') {
+            $paidAt = $updatedAt;
+        }
 
         return [
             'provider' => 'xendit',
@@ -154,8 +191,9 @@ class XenditPaymentLinkService
             'xendit_external_id' => $externalId,
             'xendit_invoice_url' => $checkoutUrl,
             'xendit_status' => $xenditStatus,
-            'status' => $this->statusMapper->normalize($xenditStatus),
+            'status' => $normalizedStatus,
             'expires_at' => $this->normalizeDateTime($expiryDate),
+            'paid_at' => $this->normalizeDateTime($paidAt),
             'success_redirect_url' => isset($responsePayload['success_redirect_url'])
                 ? (string) $responsePayload['success_redirect_url']
                 : $this->config->successRedirectUrl,
@@ -187,11 +225,68 @@ class XenditPaymentLinkService
         return $this->statusMapper;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    private function decodeJsonResponse($response, string $action): array
+    {
+        $body = (string) $response->getBody();
+        $decodedResponse = json_decode($body, true);
+
+        if (!is_array($decodedResponse)) {
+            throw new RuntimeException('Unexpected Xendit response while trying to ' . $action . ': unable to decode JSON body.');
+        }
+
+        $statusCode = (int) $response->getStatusCode();
+
+        if ($statusCode >= 400) {
+            $message = $this->extractXenditErrorMessage($decodedResponse);
+
+            throw new RuntimeException(sprintf(
+                'Xendit rejected request while trying to %s. HTTP %d: %s',
+                $action,
+                $statusCode,
+                $message
+            ));
+        }
+
+        return $decodedResponse;
+    }
+
+    /**
+     * @param array<string, mixed> $responsePayload
+     */
+    private function extractXenditErrorMessage(array $responsePayload): string
+    {
+        foreach (['message', 'error_message', 'detail'] as $key) {
+            $value = trim((string) ($responsePayload[$key] ?? ''));
+
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        if (isset($responsePayload['errors']) && is_array($responsePayload['errors'])) {
+            return json_encode($responsePayload['errors']) ?: 'Unknown Xendit validation error.';
+        }
+
+        return 'Unknown Xendit validation error.';
+    }
+
     private function assertApiReady(): void
     {
         if (trim($this->config->secretKey) === '') {
             throw new RuntimeException('Xendit secret key is not configured.');
         }
+    }
+
+    private function currentSiteUrl(string $path): string
+    {
+        if (!function_exists('site_url') && function_exists('helper')) {
+            helper('url');
+        }
+
+        return function_exists('site_url') ? site_url($path) : '';
     }
 
     /**

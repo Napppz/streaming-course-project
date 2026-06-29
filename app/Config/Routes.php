@@ -17,7 +17,6 @@ use App\Controllers\UserProfileController;
 use App\Controllers\Users\DashboardController as UserDashboardController;
 use App\Controllers\Users\CourseController as UserCourseController;
 use App\Controllers\Users\ReviewController;
-use App\Controllers\Users\CertificateController;
 use App\Controllers\UserSettingsController;
 use App\Controllers\PaymentCallbackController;
 
@@ -99,9 +98,6 @@ $routes->group('user', ['filter' => 'user'], function($routes) {
     $routes->get('payments/xendit/return', [PaymentCallbackController::class, 'xenditReturn']);
     $routes->get('payments/xendit/failure', [PaymentCallbackController::class, 'xenditFailureReturn']);
     
-    // Certificate
-    $routes->get('certificate/(:num)', [CertificateController::class, 'generate/$1']);
-    
     $routes->get('profile', [UserProfileController::class, 'index']);
     $routes->get('profile/edit', [UserProfileController::class, 'edit']);
     $routes->post('profile/update', [UserProfileController::class, 'update']);
@@ -128,7 +124,7 @@ $routes->group('course', static function($routes) {
 });
 
 // Certificate route - Login required
-$routes->get('certificate/(:num)', [CertificateController::class, 'generate/$1'], ['filter' => 'user']);
+$routes->get('certificate/(:num)', 'Users\CertificateController::generate/$1', ['filter' => 'user']);
 
 // Admin routes
 $routes->group('admin', ['filter' => 'admin'], function($routes) {

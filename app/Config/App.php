@@ -6,6 +6,42 @@ use CodeIgniter\Config\BaseConfig;
 
 class App extends BaseConfig
 {
+    public function __construct()
+    {
+        parent::__construct();
+
+        if (PHP_SAPI === 'cli') {
+            return;
+        }
+
+        $host = $_SERVER['HTTP_X_FORWARDED_HOST'] ?? $_SERVER['HTTP_HOST'] ?? '';
+        $host = trim(explode(',', $host)[0]);
+
+        if ($host === '' || ! preg_match('/^[A-Za-z0-9.\-:]+$/', $host)) {
+            return;
+        }
+
+        $hostname = explode(':', $host, 2)[0];
+        if (! in_array($hostname, $this->allowedHostnames, true)) {
+            $this->allowedHostnames[] = $hostname;
+        }
+
+        $scheme = $_SERVER['HTTP_X_FORWARDED_PROTO']
+            ?? (! empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http');
+        $scheme = trim(explode(',', $scheme)[0]);
+
+        if (! in_array($scheme, ['http', 'https'], true)) {
+            $scheme = 'http';
+        }
+
+        $configuredBaseURL = trim((string) $this->baseURL, '/');
+        if ($configuredBaseURL === '') {
+            $this->baseURL = $scheme . '://' . $host . '/';
+        } else {
+            $this->baseURL = $configuredBaseURL . '/';
+        }
+    }
+
     /**
      * --------------------------------------------------------------------------
      * Base Site URL

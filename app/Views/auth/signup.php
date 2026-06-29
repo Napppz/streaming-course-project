@@ -17,7 +17,7 @@
         </div>
     <?php endif; ?>
     
-    <form action="<?= base_url('signup') ?>" method="post">
+    <form action="/signup" method="post">
         <?= csrf_field() ?>
         
         <div class="mb-3">
@@ -47,7 +47,7 @@
     </form>
     
     <div class="text-center mt-4">
-        <p>Sudah punya akun? <a href="<?= base_url('login') ?>">Masuk</a></p>
+        <p>Sudah punya akun? <a href="/login">Masuk</a></p>
     </div>
 </div>
-<?= $this->endSection() ?> 
+<?= $this->endSection() ?>
