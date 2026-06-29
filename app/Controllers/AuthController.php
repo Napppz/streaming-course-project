@@ -3,6 +3,7 @@
 namespace App\Controllers;
 
 use App\Models\UserModel;
+use App\Models\PasswordResetModel;
 
 class AuthController extends BaseController
 {
@@ -77,6 +78,107 @@ class AuthController extends BaseController
     {
         session()->destroy();
         return redirect()->to($this->currentHostUrl('/login'));
+    }
+
+    public function forgotPassword()
+    {
+        if (session()->get('isLoggedIn')) {
+            return redirect()->to($this->currentHostUrl($this->getDashboardPath()));
+        }
+
+        return view('auth/forgot_password');
+    }
+
+    public function sendResetLink()
+    {
+        if (!$this->validate(['email' => 'required|valid_email'])) {
+            return redirect()->back()->withInput()->with('error', 'Masukkan alamat email yang valid');
+        }
+
+        $email = $this->request->getPost('email');
+        $user  = (new UserModel())->where('email', $email)->first();
+
+        if ($user) {
+            $rawToken = (new PasswordResetModel())->createToken($email);
+            $resetUrl = $this->currentHostUrl('/reset-password/' . $rawToken);
+
+            if (!$this->sendResetEmail($email, $user['full_name'] ?? $user['username'], $resetUrl)) {
+                return redirect()->back()->with('error', 'Gagal mengirim email. Silakan coba lagi nanti.');
+            }
+        }
+
+        return redirect()->to($this->currentHostUrl('/forgot-password'))
+            ->with('success', 'Jika email terdaftar, tautan reset password telah dikirim. Silakan periksa kotak masuk Anda.');
+    }
+
+    public function resetPassword(string $token)
+    {
+        if (session()->get('isLoggedIn')) {
+            return redirect()->to($this->currentHostUrl($this->getDashboardPath()));
+        }
+
+        $record = (new PasswordResetModel())->findValidToken($token);
+
+        if ($record === null) {
+            return redirect()->to($this->currentHostUrl('/forgot-password'))
+                ->with('error', 'Tautan reset password tidak valid atau sudah kedaluwarsa.');
+        }
+
+        return view('auth/reset_password', ['token' => $token]);
+    }
+
+    public function updatePassword(string $token)
+    {
+        $resetModel = new PasswordResetModel();
+        $record     = $resetModel->findValidToken($token);
+
+        if ($record === null) {
+            return redirect()->to($this->currentHostUrl('/forgot-password'))
+                ->with('error', 'Tautan reset password tidak valid atau sudah kedaluwarsa.');
+        }
+
+        $rules = [
+            'password'         => 'required|min_length[8]',
+            'password_confirm' => 'required|matches[password]',
+        ];
+
+        $messages = [
+            'password'         => ['min_length' => 'Password minimal 8 karakter'],
+            'password_confirm' => ['matches' => 'Konfirmasi password tidak cocok'],
+        ];
+
+        if (!$this->validate($rules, $messages)) {
+            return redirect()->back()->with('error', implode(' ', $this->validator->getErrors()));
+        }
+
+        $userModel = new UserModel();
+        $user      = $userModel->where('email', $record['email'])->first();
+
+        if (!$user) {
+            return redirect()->to($this->currentHostUrl('/forgot-password'))
+                ->with('error', 'Akun tidak ditemukan.');
+        }
+
+        $userModel->update($user['id'], ['password' => $this->request->getPost('password')]);
+        $resetModel->clearForEmail($record['email']);
+
+        return redirect()->to($this->currentHostUrl('/login'))
+            ->with('success', 'Password berhasil diperbarui. Silakan login dengan password baru Anda.');
+    }
+
+    private function sendResetEmail(string $toEmail, string $name, string $resetUrl): bool
+    {
+        $email = \Config\Services::email();
+
+        $email->setTo($toEmail);
+        $email->setSubject('Reset Password - Sistem Pembelajaran Online');
+        $email->setMailType('html');
+        $email->setMessage(view('emails/reset_password', [
+            'name'     => $name,
+            'resetUrl' => $resetUrl,
+        ]));
+
+        return $email->send();
     }
 
     private function setUserSession($user)

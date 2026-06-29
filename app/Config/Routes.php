@@ -62,6 +62,12 @@ $routes->get('/signup', 'AuthController::signup');
 $routes->post('/signup', 'AuthController::attemptSignup');
 $routes->get('/logout', 'AuthController::logout');
 
+// Forgot / reset password routes
+$routes->get('/forgot-password', 'AuthController::forgotPassword');
+$routes->post('/forgot-password', 'AuthController::sendResetLink');
+$routes->get('/reset-password/(:segment)', 'AuthController::resetPassword/$1');
+$routes->post('/reset-password/(:segment)', 'AuthController::updatePassword/$1');
+
 // Course routes - public
 $routes->get('/course', [CourseController2::class, 'index']);
 $routes->post('/api/payments/webhook', [PaymentCallbackController::class, 'xenditWebhook']);

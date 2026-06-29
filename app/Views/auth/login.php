@@ -49,7 +49,11 @@
         </div>
     </form>
     
-    <div class="text-center mt-4">
+    <div class="text-center mt-3">
+        <p><a href="/forgot-password">Lupa password?</a></p>
+    </div>
+
+    <div class="text-center mt-2">
         <p>Belum punya akun? <a href="/signup">Daftar Sekarang</a></p>
     </div>
 </div>
