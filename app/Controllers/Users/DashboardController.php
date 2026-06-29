@@ -18,6 +18,7 @@ class DashboardController extends BaseController
     protected $enrollmentModel;
     protected $lessonProgressModel;
     protected $paymentTransactionModel;
+    protected $xenditPaymentLinkService;
     protected $currentUser;
     
     public function __construct()
@@ -26,6 +27,7 @@ class DashboardController extends BaseController
         $this->enrollmentModel = new EnrollmentModel();
         $this->lessonProgressModel = new LessonProgressModel();
         $this->paymentTransactionModel = new CoursePaymentTransactionModel();
+        $this->xenditPaymentLinkService = service('xenditPaymentLinks');
         
         // Get user from session using the helper method
         $this->currentUser = $this->getCurrentUser();
@@ -83,6 +85,10 @@ class DashboardController extends BaseController
     public function paymentHistory()
     {
         $userId = (int) $this->currentUser['id'];
+        $this->syncPendingXenditTransactions(
+            $this->paymentTransactionModel->findTransactionsForUser($userId)
+        );
+
         $paymentTransactions = $this->decoratePaymentTransactions(
             $this->paymentTransactionModel->findTransactionsForUser($userId)
         );
@@ -94,6 +100,99 @@ class DashboardController extends BaseController
             'pendingTransactionCount' => $this->paymentTransactionModel->countTransactionsByStatusForUser($userId, 'pending'),
             'totalTransactionCount' => count($paymentTransactions),
         ]);
+    }
+
+    private function syncPendingXenditTransactions(array $paymentTransactions): void
+    {
+        foreach ($paymentTransactions as $transaction) {
+            if (($transaction['provider'] ?? null) !== 'xendit') {
+                continue;
+            }
+
+            if (($transaction['status'] ?? 'pending') !== 'pending' || empty($transaction['xendit_invoice_id'])) {
+                continue;
+            }
+
+            try {
+                $providerResponse = $this->xenditPaymentLinkService->getInvoiceById((string) $transaction['xendit_invoice_id']);
+                $providerMetadata = $providerResponse['provider_metadata'] ?? [];
+                $status = (string) ($providerMetadata['status'] ?? 'pending');
+
+                if (!in_array($status, ['paid', 'expired', 'cancelled', 'failed'], true)) {
+                    continue;
+                }
+
+                $updateData = $this->buildProviderPaymentUpdateData($transaction, $providerMetadata, $status);
+
+                if ($status === 'paid') {
+                    $updateData = array_merge($updateData, $this->buildEnrollmentGrantData($transaction));
+                }
+
+                $this->paymentTransactionModel->update((int) $transaction['id'], $updateData);
+            } catch (\Throwable $exception) {
+                log_message('warning', 'Payment history Xendit sync failed for transaction {transactionId}: {message}', [
+                    'transactionId' => $transaction['id'] ?? 'unknown',
+                    'message' => $exception->getMessage(),
+                ]);
+            }
+        }
+    }
+
+    private function buildProviderPaymentUpdateData(array $transaction, array $providerMetadata, string $status): array
+    {
+        $now = date('Y-m-d H:i:s');
+        $updateData = [
+            'status' => $status,
+            'xendit_status' => $providerMetadata['xendit_status'] ?? ($transaction['xendit_status'] ?? null),
+            'xendit_invoice_id' => $providerMetadata['xendit_invoice_id'] ?? ($transaction['xendit_invoice_id'] ?? null),
+            'xendit_external_id' => $providerMetadata['xendit_external_id'] ?? ($transaction['xendit_external_id'] ?? null),
+            'xendit_invoice_url' => $providerMetadata['xendit_invoice_url'] ?? ($transaction['xendit_invoice_url'] ?? null),
+            'checkout_url' => $providerMetadata['checkout_url'] ?? ($transaction['checkout_url'] ?? null),
+            'expires_at' => $providerMetadata['expires_at'] ?? ($transaction['expires_at'] ?? null),
+        ];
+
+        if ($status === 'paid') {
+            $updateData['paid_at'] = $transaction['paid_at'] ?: ($providerMetadata['paid_at'] ?? null) ?: $now;
+            $updateData['expired_at'] = $transaction['expired_at'] ?? null;
+            $updateData['cancelled_at'] = $transaction['cancelled_at'] ?? null;
+            $updateData['failure_code'] = null;
+            $updateData['failure_message'] = null;
+        }
+
+        if ($status === 'expired' && empty($transaction['expired_at'])) {
+            $updateData['expired_at'] = $providerMetadata['expires_at'] ?? $now;
+        }
+
+        if ($status === 'cancelled' && empty($transaction['cancelled_at'])) {
+            $updateData['cancelled_at'] = $now;
+        }
+
+        if ($status === 'failed') {
+            $updateData['failure_code'] = $transaction['failure_code'] ?? 'payment_failed';
+            $updateData['failure_message'] = $transaction['failure_message'] ?? 'Pembayaran tidak berhasil di Xendit.';
+        }
+
+        return $updateData;
+    }
+
+    private function buildEnrollmentGrantData(array $transaction): array
+    {
+        $now = date('Y-m-d H:i:s');
+        $enrollment = $this->enrollmentModel->getEnrollment((int) $transaction['user_id'], (int) $transaction['course_id']);
+
+        if (!$enrollment) {
+            $this->enrollmentModel->enrollUser((int) $transaction['user_id'], (int) $transaction['course_id']);
+            $enrollment = $this->enrollmentModel->getEnrollment((int) $transaction['user_id'], (int) $transaction['course_id']);
+        }
+
+        if (!$enrollment) {
+            throw new \RuntimeException('Paid transaction could not be linked to an enrollment.');
+        }
+
+        return [
+            'granted_enrollment_id' => (int) $enrollment['id'],
+            'granted_at' => $transaction['granted_at'] ?: $now,
+        ];
     }
 
     public function invoice(int $transactionId)

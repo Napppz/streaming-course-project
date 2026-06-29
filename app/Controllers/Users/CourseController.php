@@ -281,6 +281,8 @@ class CourseController extends BaseController
                 'currency' => (string) ($course['price_currency'] ?? 'IDR'),
                 'course_title' => (string) $course['title'],
                 'course_url' => site_url('user/view-course/' . $course['id']),
+                'success_redirect_url' => site_url('payment/xendit/success'),
+                'failure_redirect_url' => site_url('payment/xendit/failure'),
                 'customer_email' => (string) ($this->currentUser['email'] ?? ''),
                 'customer_name' => $customerName,
                 'customer_phone' => (string) ($transaction['customer_phone'] ?? ''),

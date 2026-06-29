@@ -117,6 +117,30 @@ abstract class BaseController extends Controller
             ? '/admin/dashboard'
             : '/user/dashboard';
     }
+
+    /**
+     * Build an absolute URL from the active request host.
+     */
+    protected function currentHostUrl(string $path): string
+    {
+        $uri = $this->request->getUri();
+        $scheme = $this->request->getHeaderLine('X-Forwarded-Proto') ?: $uri->getScheme();
+        $host = $this->request->getHeaderLine('X-Forwarded-Host') ?: $uri->getHost();
+        $port = $this->request->getHeaderLine('X-Forwarded-Port') ?: $uri->getPort();
+        $scheme = trim(explode(',', $scheme)[0]);
+        $host = trim(explode(',', $host)[0]);
+
+        if ($host === '') {
+            return $path;
+        }
+
+        $authority = $host;
+        if ($port !== '' && $port !== null && ! in_array($port, [80, 443], true)) {
+            $authority .= ':' . $port;
+        }
+
+        return rtrim($scheme . '://' . $authority, '/') . '/' . ltrim($path, '/');
+    }
     
     /**
      * Get the current user ID

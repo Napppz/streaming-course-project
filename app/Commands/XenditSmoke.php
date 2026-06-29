@@ -51,6 +51,7 @@ class XenditSmoke extends BaseCommand
         $userId = (int) ($params[2] ?? $this->optionValue($params, 'user', 7));
         $amount = (int) ($params[3] ?? $this->optionValue($params, 'amount', 250000));
         $attempts = max(0, (int) ($params[4] ?? $this->optionValue($params, 'attempts', 0)));
+        $xenditConfig = config('Xendit');
 
         $payload = $service->buildPaymentLinkPayload([
             'course_id' => $courseId,
@@ -61,8 +62,8 @@ class XenditSmoke extends BaseCommand
             'customer_name' => 'Smoke Test User',
             'customer_phone' => '+6281234567890',
             'historical_attempt_count' => $attempts,
-            'success_redirect_url' => 'http://localhost:8080/payment/xendit/success',
-            'failure_redirect_url' => 'http://localhost:8080/payment/xendit/failure',
+            'success_redirect_url' => $xenditConfig->successRedirectUrl,
+            'failure_redirect_url' => $xenditConfig->failureRedirectUrl,
             'metadata' => [
                 'smoke' => true,
             ],
@@ -77,9 +78,19 @@ class XenditSmoke extends BaseCommand
 
     private function optionValue(array $params, string $option, mixed $default = null): mixed
     {
+        $cliOption = CLI::getOption($option);
+
+        if ($cliOption !== null) {
+            return $cliOption;
+        }
+
         $prefix = '--' . $option . '=';
 
         foreach ($params as $index => $param) {
+            if (!is_string($param)) {
+                continue;
+            }
+
             if (str_starts_with($param, $prefix)) {
                 return substr($param, strlen($prefix));
             }

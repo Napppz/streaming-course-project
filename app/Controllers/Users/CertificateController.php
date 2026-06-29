@@ -115,12 +115,10 @@ class CertificateController extends BaseController
                 'course' => $course,
                 'completedDate' => $completedDate,
                 'certificateNumber' => $certificateNumber,
-                'imagePath' => FCPATH . 'assets/images/' // Path absolut ke folder gambar
+                'imagePath' => $this->assetPathForPdf('assets/images/'),
+                'supportsImages' => extension_loaded('gd')
             ];
-            
-            $pageCount = $dompdf->getCanvas()->get_page_count();
-            log_message('info', 'Total pages: ' . $pageCount);
-            
+
             // Konten HTML untuk sertifikat
             $html = view('user/certificate_template', $viewData);
 
@@ -130,17 +128,33 @@ class CertificateController extends BaseController
             // Render PDF dengan opsi caching
             $dompdf->render();
 
-            // Output PDF
-            return $dompdf->stream("sertifikat-{$course['slug']}.pdf", [
-                "Attachment" => false
-            ]);
-            
-        } catch (\Exception $e) {
+            $filename = $this->safeCertificateFilename((string) ($course['slug'] ?? $course['title'] ?? 'sertifikat'));
+            $pdf = $dompdf->output();
+
+            return $this->response
+                ->setHeader('Content-Type', 'application/pdf')
+                ->setHeader('Content-Disposition', 'inline; filename="' . $filename . '"')
+                ->setBody($pdf);
+
+        } catch (\Throwable $e) {
             // Log error
             log_message('error', 'Error generating PDF: ' . $e->getMessage());
-            
+
             // Tampilkan pesan error
             return redirect()->back()->with('error', 'Gagal membuat sertifikat PDF: ' . $e->getMessage());
         }
     }
-} 
+
+    private function assetPathForPdf(string $path): string
+    {
+        return str_replace('\\', '/', FCPATH . ltrim($path, '/'));
+    }
+
+    private function safeCertificateFilename(string $name): string
+    {
+        $filename = preg_replace('/[^A-Za-z0-9\-_]+/', '-', strtolower($name));
+        $filename = trim((string) $filename, '-');
+
+        return 'sertifikat-' . ($filename ?: 'kursus') . '.pdf';
+    }
+}

@@ -327,9 +327,19 @@ function initMarkComplete() {
 
   markCompleteBtn.addEventListener("click", function () {
     const lessonId = this.getAttribute("data-lesson-id");
-    const moduleId = this.getAttribute("data-module-id");
+    const pathParts = window.location.pathname.split("/");
+    const courseId = this.getAttribute("data-course-id") || pathParts[2];
+
+    if (!courseId || !lessonId) {
+      console.error("Missing course or lesson id for mark complete", {
+        courseId,
+        lessonId,
+      });
+      return;
+    }
+
     // Send AJAX request to mark lesson as complete
-    fetch(`/api/mark-complete/${moduleId}/${lessonId}`, {
+    fetch(`/api/mark-complete/${courseId}/${lessonId}`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -363,6 +373,8 @@ function initMarkComplete() {
               icon.classList.add("fas", "fa-check-circle", "text-blue-600");
             }
           }
+        } else {
+          console.error("Failed to mark lesson as complete:", data.message);
         }
       })
       .catch((error) => {

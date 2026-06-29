@@ -56,17 +56,21 @@
                                 <?php endif; ?>
                             </td>
                             <td>
-                                <?php if (!empty($course['is_premium'])): ?>
+                                <?php
+                                    $isPremium = !empty($course['is_premium']);
+                                    $priceAmount = (int) ($course['price_amount'] ?? 0);
+                                    $isPurchasable = !empty($course['is_purchasable']);
+                                ?>
+
+                                <?php if ($isPremium && $priceAmount > 0 && $isPurchasable): ?>
                                     <span class="badge bg-warning text-dark">Premium</span>
                                     <div class="small text-muted mt-1">
-                                        <?= esc(strtoupper($course['price_currency'] ?? 'IDR')) ?> <?= number_format((int) ($course['price_amount'] ?? 0)) ?>
+                                        <?= esc(strtoupper($course['price_currency'] ?? 'IDR')) ?> <?= number_format($priceAmount) ?>
                                     </div>
-                                    <div class="small text-muted">
-                                        <?= !empty($course['is_purchasable']) ? 'Purchasable' : 'Purchase disabled' ?>
-                                    </div>
+                                    <div class="small text-muted">Purchasable</div>
                                 <?php else: ?>
                                     <span class="badge bg-info text-dark">Free</span>
-                                    <div class="small text-muted mt-1">No payment required</div>
+                                    <div class="small text-muted mt-1">No premium access</div>
                                 <?php endif; ?>
                             </td>
                             <td><?= ucfirst($course['level']) ?></td>

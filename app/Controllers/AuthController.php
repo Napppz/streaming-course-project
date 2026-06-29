@@ -10,7 +10,7 @@ class AuthController extends BaseController
     {
         // Jika sudah login, redirect ke dashboard
         if (session()->get('isLoggedIn')) {
-            return redirect()->to($this->getDashboardPath());
+            return redirect()->to($this->currentHostUrl($this->getDashboardPath()));
         }
 
         return view('auth/login');
@@ -45,14 +45,14 @@ class AuthController extends BaseController
         $this->setUserSession($user);
 
         // Redirect berdasarkan role
-        return redirect()->to($this->getDashboardPath($user['role']));
+        return redirect()->to($this->currentHostUrl($this->getDashboardPath($user['role'])));
     }
 
     public function signup()
     {
         // Jika sudah login, redirect ke dashboard
         if (session()->get('isLoggedIn')) {
-            return redirect()->to($this->getDashboardPath());
+            return redirect()->to($this->currentHostUrl($this->getDashboardPath()));
         }
 
         return view('auth/signup');
@@ -70,13 +70,13 @@ class AuthController extends BaseController
             return redirect()->back()->withInput()->with('errors', $model->errors());
         }
 
-        return redirect()->to('/login')->with('success', 'Pendaftaran berhasil! Silakan login.');
+        return redirect()->to($this->currentHostUrl('/login'))->with('success', 'Pendaftaran berhasil! Silakan login.');
     }
 
     public function logout()
     {
         session()->destroy();
-        return redirect()->to('/login');
+        return redirect()->to($this->currentHostUrl('/login'));
     }
 
     private function setUserSession($user)

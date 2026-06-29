@@ -11,11 +11,11 @@ class AdminFilter implements FilterInterface
     public function before(RequestInterface $request, $arguments = null)
     {
         if (!session()->get('isLoggedIn')) {
-            return redirect()->to('/login');
+            return redirect()->to(site_url('login'));
         }
 
         if (!in_array(session()->get('role'), ['admin', 'super_admin'], true)) {
-            return redirect()->to('/user/dashboard')->with('error', 'Akses ditolak. Anda tidak memiliki izin untuk mengakses halaman tersebut.');
+            return redirect()->to(site_url('user/dashboard'))->with('error', 'Akses ditolak. Anda tidak memiliki izin untuk mengakses halaman tersebut.');
         }
     }
 
